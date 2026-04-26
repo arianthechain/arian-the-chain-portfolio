@@ -149,7 +149,9 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
             }
           >
             {visibleHoldings.map((h) => {
-              const pct = (h.valueUsd / totalValue) * 100;
+              const valueRounded = Math.round(h.valueUsd);
+              const pct =
+                displayedTotal > 0 ? (valueRounded / displayedTotal) * 100 : 0;
               return (
                 <div
                   key={h.symbol}
