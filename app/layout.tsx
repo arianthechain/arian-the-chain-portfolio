@@ -20,8 +20,24 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000",
+  ),
   title: `${config.profile.name} · Portfolio`,
   description: `On-chain portfolio of ${config.profile.name} (/u/${config.profile.handle})`,
+  openGraph: {
+    title: `${config.profile.name} · Portfolio`,
+    description: `Live on-chain portfolio of ${config.profile.name}`,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${config.profile.name} · Portfolio`,
+    description: `Live on-chain portfolio of ${config.profile.name}`,
+    creator: config.profile.twitter ? `@${config.profile.twitter}` : undefined,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
