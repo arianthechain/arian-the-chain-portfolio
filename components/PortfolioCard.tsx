@@ -122,7 +122,10 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
             valueClass={colorAllTime}
           />
           <Stat label="Active since" value={activeSinceText(data, profile)} />
-          <Stat label="Holdings" value={`${data.holdings.length} assets`} />
+          <Stat
+            label="Holdings"
+            value={`${data.holdings.length} ${data.holdings.length === 1 ? "asset" : "assets"}`}
+          />
         </div>
 
         {/* Holdings list */}
