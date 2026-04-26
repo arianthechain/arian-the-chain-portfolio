@@ -108,6 +108,11 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <p className="font-display text-[32px] text-white leading-none tracking-tight">
             {fmtUsd(data.totalValueUsd)}
           </p>
+          {cleanPctAll !== 0 && (
+            <p className={`font-mono text-[12px] mt-1.5 ${colorAllTime}`}>
+              {fmtPct(cleanPctAll)}
+            </p>
+          )}
         </div>
 
         {/* Stats */}
@@ -118,14 +123,10 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <Stat label="Cost basis" value={fmtUsd(data.costBasisUsd)} />
           <Stat
             label="P&L"
-            value={`${fmtSignedUsd(data.allTimePnlUsd)} · ${fmtPct(cleanPctAll)}`}
+            value={fmtSignedUsd(data.allTimePnlUsd)}
             valueClass={colorAllTime}
           />
           <Stat label="Active since" value={activeSinceText(data, profile)} />
-          <Stat
-            label="Holdings"
-            value={`${data.holdings.length} ${data.holdings.length === 1 ? "asset" : "assets"}`}
-          />
         </div>
 
         {/* Holdings list */}
