@@ -1,7 +1,9 @@
 import { ImageResponse } from "next/og";
 import { fetchPortfolio } from "@/lib/zerion";
 import { config } from "@/lib/config";
+import type { PortfolioData } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = `${config.profile.name} on-chain portfolio`;
@@ -14,9 +16,18 @@ const fmtUsd = (n: number) =>
   }).format(n);
 
 export default async function OG() {
-  const data = await fetchPortfolio();
+  let data: PortfolioData | null = null;
+  try {
+    data = await fetchPortfolio();
+  } catch {
+    data = null;
+  }
+
   const profile = config.profile;
-  const positiveAllTime = data.allTimePnlUsd >= 0;
+  const totalValue = data?.totalValueUsd ?? 0;
+  const allTimePnl = data?.allTimePnlUsd ?? 0;
+  const holdingsCount = data?.holdings.length ?? 0;
+  const positiveAllTime = allTimePnl >= 0;
 
   return new ImageResponse(
     (
@@ -34,15 +45,12 @@ export default async function OG() {
           padding: 60,
         }}
       >
-        {/* Top label */}
         <div
           style={{
             position: "absolute",
             top: 40,
             left: 60,
             display: "flex",
-            alignItems: "center",
-            gap: 12,
             fontSize: 18,
             color: "rgba(255,255,255,0.4)",
             letterSpacing: 4,
@@ -77,7 +85,6 @@ export default async function OG() {
           Live
         </div>
 
-        {/* Center: profile + value */}
         <div
           style={{
             display: "flex",
@@ -129,6 +136,7 @@ export default async function OG() {
 
         <div
           style={{
+            display: "flex",
             fontSize: 22,
             color: "rgba(255,255,255,0.4)",
             letterSpacing: 6,
@@ -140,44 +148,56 @@ export default async function OG() {
         </div>
         <div
           style={{
+            display: "flex",
             fontSize: 140,
             fontWeight: 600,
             letterSpacing: -4,
             lineHeight: 1,
           }}
         >
-          {fmtUsd(data.totalValueUsd)}
+          {fmtUsd(totalValue)}
         </div>
         <div
           style={{
+            display: "flex",
             fontSize: 30,
             color: positiveAllTime ? "#34d399" : "#f87171",
             marginTop: 24,
           }}
         >
-          {positiveAllTime ? "+" : ""}
-          {fmtUsd(data.allTimePnlUsd)} all-time &middot; {data.holdings.length}{" "}
-          assets
+          {`${positiveAllTime ? "+" : ""}${fmtUsd(allTimePnl)} all-time · ${holdingsCount} assets`}
         </div>
 
-        {/* Footer */}
         <div
           style={{
             position: "absolute",
             bottom: 40,
+            left: 60,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            width: "calc(100% - 120px)",
             fontSize: 18,
             color: "rgba(255,255,255,0.3)",
             letterSpacing: 3,
             textTransform: "uppercase",
           }}
         >
-          <div>{profile.domain}</div>
-          {profile.twitter && <div>@{profile.twitter}</div>}
+          {profile.domain}
         </div>
+        {profile.twitter && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 40,
+              right: 60,
+              display: "flex",
+              fontSize: 18,
+              color: "rgba(255,255,255,0.3)",
+              letterSpacing: 3,
+              textTransform: "uppercase",
+            }}
+          >
+            @{profile.twitter}
+          </div>
+        )}
       </div>
     ),
     { ...size },

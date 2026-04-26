@@ -26,7 +26,8 @@ function tokenStyle(symbol: string): { color: string; char: string } {
 function authHeader(): string {
   const key = process.env.ZERION_API_KEY;
   if (!key) throw new Error("ZERION_API_KEY not set");
-  return "Basic " + Buffer.from(`${key}:`).toString("base64");
+  // btoa works di edge + node, beda sama Buffer.from yang node-only
+  return "Basic " + btoa(`${key}:`);
 }
 
 /**
