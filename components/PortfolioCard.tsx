@@ -68,7 +68,7 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
         : "text-white/70";
 
   return (
-    <div className="card-holo rounded-[14px] p-[1.5px]">
+    <div id="portfolio-card" className="card-holo rounded-[14px] p-[1.5px]">
       <div className="rounded-[12px] p-5 sm:p-6">
         {/* Top: status + label */}
         <div className="flex items-center justify-between pb-3 mb-4 border-b border-white/5">
@@ -141,13 +141,7 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <p className="text-[10px] tracking-[0.18em] uppercase text-white/40 font-mono mb-2">
             Holdings
           </p>
-          <div
-            className={
-              visibleHoldings.length <= 2
-                ? "flex flex-col gap-1.5"
-                : "grid grid-cols-2 gap-x-3 gap-y-1.5"
-            }
-          >
+          <div className="flex flex-col gap-1.5">
             {visibleHoldings.map((h) => {
               const valueRounded = Math.round(h.valueUsd);
               const pct =

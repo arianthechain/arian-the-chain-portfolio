@@ -10,6 +10,7 @@ const TOKEN_COLORS: Record<string, { color: string; char: string }> = {
   BTC: { color: "#F7931A", char: "B" },
   ETH: { color: "#627EEA", char: "E" },
   SOL: { color: "#9945FF", char: "S" },
+  BNB: { color: "#F3BA2F", char: "B" },
   LINK: { color: "#2A5ADA", char: "L" },
   AAVE: { color: "#B6509E", char: "A" },
   USDC: { color: "#2775CA", char: "U" },
