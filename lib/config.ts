@@ -1,6 +1,7 @@
 import type { AppConfig } from "./types";
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+const SOLANA_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 /**
  * Edit di sini — semua konfigurasi profile, wallet, dan override manual.
@@ -20,7 +21,7 @@ const _config: AppConfig = {
       "0x9bA0f2565c532F4a5efe40AAc914163594f8e468",
     ],
     solana: [
-      // Tambah address Solana lo
+      "2hyyf9pJAMB78VjWJ8JLZnhYtXt7ApBbSD1U2Qa2Rc1X",
     ],
     bitcoin: [
       // Tambah address Bitcoin lo
@@ -56,11 +57,18 @@ const _config: AppConfig = {
   ],
 };
 
-// Validate EVM addresses biar fail-fast kalo ada yang typo
+// Validate addresses biar fail-fast kalo ada yang typo
 for (const addr of _config.wallets.evm) {
   if (!EVM_ADDRESS_RE.test(addr)) {
     throw new Error(
       `Invalid EVM address di config: "${addr}". Harus format 0x + 40 hex chars.`,
+    );
+  }
+}
+for (const addr of _config.wallets.solana ?? []) {
+  if (!SOLANA_ADDRESS_RE.test(addr)) {
+    throw new Error(
+      `Invalid Solana address di config: "${addr}". Harus format base58 32-44 chars.`,
     );
   }
 }

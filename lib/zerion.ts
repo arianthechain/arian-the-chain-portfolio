@@ -167,12 +167,14 @@ async function fetchTxStats(
  */
 export async function fetchPortfolio(): Promise<PortfolioData> {
   const evmAddresses = config.wallets.evm;
+  const solanaAddresses = config.wallets.solana ?? [];
+  const allAddresses = [...evmAddresses, ...solanaAddresses];
   const hasApiKey = !!process.env.ZERION_API_KEY;
-  const hasAddresses = evmAddresses.length > 0;
+  const hasAddresses = allAddresses.length > 0;
 
   console.log("\n[Portfolio] ─────────────────────────────");
   console.log("[Portfolio] API key:", hasApiKey ? "SET ✓" : "MISSING ✗");
-  console.log("[Portfolio] EVM addresses:", evmAddresses.length, evmAddresses);
+  console.log("[Portfolio] EVM:", evmAddresses.length, "/ Solana:", solanaAddresses.length);
 
   if (!hasApiKey || !hasAddresses) {
     console.log("[Portfolio] → Using MOCK data (set API key + addresses to use real data)\n");
@@ -181,13 +183,13 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
 
   console.log("[Portfolio] → Fetching REAL data from Zerion...\n");
 
-  const ownAddresses = new Set(evmAddresses.map((a) => a.toLowerCase()));
+  const ownAddresses = new Set(allAddresses.map((a) => a.toLowerCase()));
   const allHoldings: Holding[] = [];
   let totalReceived = 0;
   let firstDepositValue = 0;
   let earliestTx: Date | null = null;
 
-  for (const addr of evmAddresses) {
+  for (const addr of allAddresses) {
     try {
       const [positions, txStats] = await Promise.all([
         fetchPositions(addr),
