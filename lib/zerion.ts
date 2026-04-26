@@ -62,51 +62,58 @@ async function fetchPositions(address: string): Promise<Holding[]> {
 }
 
 /**
- * Fetch P&L untuk satu wallet (cost basis + lifetime gain).
+ * Fetch tx stats — first tx date + cost basis (sum of all incoming USD value).
+ * Internal transfers antar wallet user di-skip otomatis (kalo lo daftarin
+ * multi-wallet, transfer antar mereka ga keitung sebagai deposit baru).
  */
-async function fetchPnl(address: string): Promise<{ costBasis: number; pnl: number }> {
-  const url = `${ZERION_BASE}/wallets/${address}/pnl/?currency=usd`;
-  const res = await fetch(url, {
-    headers: { Authorization: authHeader(), Accept: "application/json" },
-    next: { revalidate: 300 },
-  });
-  if (!res.ok) return { costBasis: 0, pnl: 0 };
-  const json = await res.json();
-  const attr = json.data?.attributes ?? {};
-  return {
-    costBasis: Number(attr.total_fees ?? attr.bought ?? 0),
-    pnl: Number(attr.realized_gain ?? attr.unrealized_gain ?? 0),
-  };
-}
-
-/**
- * Cari tx paling awal di wallet (biar bisa tau sejak kapan aktif).
- * Zerion default sort by mined_at desc, jadi kita ambil 1 tx terbaru,
- * lalu pake pagination meta untuk dapet yang paling lama.
- */
-async function fetchFirstTxDate(address: string): Promise<Date | null> {
-  // Coba ambil transaksi paling lama dengan reverse sort
+async function fetchTxStats(
+  address: string,
+  ownAddresses: Set<string>,
+): Promise<{ firstTxDate: Date | null; costBasisUsd: number; txCount: number }> {
   const url = `${ZERION_BASE}/wallets/${address}/transactions/?currency=usd&page[size]=100`;
   try {
     const res = await fetch(url, {
       headers: { Authorization: authHeader(), Accept: "application/json" },
-      next: { revalidate: 3600 },
+      next: { revalidate: 60 },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.log(`[Portfolio]   txStats ${address}: HTTP ${res.status}`);
+      return { firstTxDate: null, costBasisUsd: 0, txCount: 0 };
+    }
     const json = await res.json();
     const txs = json.data ?? [];
-    if (txs.length === 0) return null;
-    // Cari tx dengan mined_at paling awal
+
     let earliest: Date | null = null;
+    let totalReceived = 0;
+
     for (const tx of txs) {
-      const minedAt = tx.attributes?.mined_at;
-      if (!minedAt) continue;
-      const d = new Date(minedAt);
-      if (!earliest || d < earliest) earliest = d;
+      const attr = tx.attributes ?? {};
+      const minedAt = attr.mined_at;
+      if (minedAt) {
+        const d = new Date(minedAt);
+        if (!earliest || d < earliest) earliest = d;
+      }
+
+      const transfers = attr.transfers ?? [];
+      for (const t of transfers) {
+        const direction = t.direction;
+        if (direction !== "in") continue;
+
+        // Skip internal transfer dari wallet user sendiri
+        const senderAddr = (t.sender ?? t.sender_address ?? "").toLowerCase();
+        if (senderAddr && ownAddresses.has(senderAddr)) continue;
+
+        const value = Number(t.value ?? 0);
+        if (Number.isFinite(value) && value > 0) {
+          totalReceived += value;
+        }
+      }
     }
-    return earliest;
-  } catch {
-    return null;
+
+    return { firstTxDate: earliest, costBasisUsd: totalReceived, txCount: txs.length };
+  } catch (err) {
+    console.error(`[Portfolio]   txStats ${address} error:`, err);
+    return { firstTxDate: null, costBasisUsd: 0, txCount: 0 };
   }
 }
 
@@ -130,24 +137,27 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
 
   console.log("[Portfolio] → Fetching REAL data from Zerion...\n");
 
+  const ownAddresses = new Set(evmAddresses.map((a) => a.toLowerCase()));
   const allHoldings: Holding[] = [];
   let totalCostBasis = 0;
-  let totalPnl = 0;
   let earliestTx: Date | null = null;
 
   for (const addr of evmAddresses) {
     try {
-      const [positions, pnl, firstTx] = await Promise.all([
+      const [positions, txStats] = await Promise.all([
         fetchPositions(addr),
-        fetchPnl(addr),
-        fetchFirstTxDate(addr),
+        fetchTxStats(addr, ownAddresses),
       ]);
-      console.log(`[Portfolio]   ${addr.slice(0, 10)}... → ${positions.length} positions, first tx: ${firstTx?.toISOString() ?? "none"}`);
+      console.log(
+        `[Portfolio]   ${addr.slice(0, 10)}... → ${positions.length} positions, ${txStats.txCount} txs, received $${txStats.costBasisUsd.toFixed(2)}, first tx ${txStats.firstTxDate?.toISOString() ?? "none"}`,
+      );
       allHoldings.push(...positions);
-      totalCostBasis += pnl.costBasis;
-      totalPnl += pnl.pnl;
-      if (firstTx && (!earliestTx || firstTx < earliestTx)) {
-        earliestTx = firstTx;
+      totalCostBasis += txStats.costBasisUsd;
+      if (
+        txStats.firstTxDate &&
+        (!earliestTx || txStats.firstTxDate < earliestTx)
+      ) {
+        earliestTx = txStats.firstTxDate;
       }
     } catch (err) {
       console.error(`[Portfolio]   ${addr} FAILED:`, err);
