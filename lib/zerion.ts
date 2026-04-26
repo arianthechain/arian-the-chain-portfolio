@@ -36,29 +36,39 @@ function authHeader(): string {
  */
 async function fetchPositions(address: string): Promise<Holding[]> {
   const url = `${ZERION_BASE}/wallets/${address}/positions/?currency=usd&filter[positions]=no_filter`;
-  const res = await fetch(url, {
-    headers: { Authorization: authHeader(), Accept: "application/json" },
-    next: { revalidate: 60 },
-  });
-  if (!res.ok) throw new Error(`Zerion positions ${res.status}`);
-  const json = await res.json();
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: authHeader(), Accept: "application/json" },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) {
+      console.error(
+        `[Portfolio]   positions ${address}: HTTP ${res.status} ${res.statusText}`,
+      );
+      return [];
+    }
+    const json = await res.json();
 
-  return (json.data ?? []).map((pos: any): Holding => {
-    const attr = pos.attributes ?? {};
-    const fungible = attr.fungible_info ?? {};
-    const symbol = String(fungible.symbol ?? "").toUpperCase();
-    const style = tokenStyle(symbol);
-    return {
-      symbol,
-      name: fungible.name ?? symbol,
-      amount: Number(attr.quantity?.float ?? 0),
-      priceUsd: Number(attr.price ?? 0),
-      valueUsd: Number(attr.value ?? 0),
-      change24h: Number(attr.changes?.percent_1d ?? 0),
-      color: style.color,
-      iconChar: style.char,
-    };
-  });
+    return (json.data ?? []).map((pos: any): Holding => {
+      const attr = pos.attributes ?? {};
+      const fungible = attr.fungible_info ?? {};
+      const symbol = String(fungible.symbol ?? "").toUpperCase();
+      const style = tokenStyle(symbol);
+      return {
+        symbol,
+        name: fungible.name ?? symbol,
+        amount: Number(attr.quantity?.float ?? 0),
+        priceUsd: Number(attr.price ?? 0),
+        valueUsd: Number(attr.value ?? 0),
+        change24h: Number(attr.changes?.percent_1d ?? 0),
+        color: style.color,
+        iconChar: style.char,
+      };
+    });
+  } catch (err) {
+    console.error(`[Portfolio]   positions ${address} threw:`, err);
+    return [];
+  }
 }
 
 /**
