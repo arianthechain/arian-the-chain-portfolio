@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: #0a0b14;
+  color: #e8e9f0;
+  min-height: 100vh;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(184, 147, 46, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 50% 110%, rgba(98, 126, 234, 0.08), transparent);
+  background-attachment: fixed;
+}
+
+/* Subtle grain texture */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.6 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+}
+
+/* Holographic border for the legendary card */
+.card-holo {
+  position: relative;
+  isolation: isolate;
+}
+
+.card-holo::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--angle),
+    #d4af37,
+    #6e7cff,
+    #d4af37,
+    #ff6ec7,
+    #d4af37,
+    #00d4aa,
+    #d4af37
+  );
+  z-index: -1;
+  animation: holo-spin 8s linear infinite;
+  opacity: 0.85;
+}
+
+.card-holo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #14172a 0%, #0e1020 100%);
+  z-index: -1;
+}
+
+@keyframes holo-spin {
+  to { --angle: 360deg; }
+}
+
+/* Foil shimmer on art panel */
+.foil {
+  position: relative;
+  overflow: hidden;
+}
+
+.foil::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 70%
+  );
+  pointer-events: none;
+  animation: foil-sweep 5s ease-in-out infinite;
+}
+
+@keyframes foil-sweep {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
