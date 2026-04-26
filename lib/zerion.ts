@@ -72,14 +72,20 @@ async function fetchPositions(address: string): Promise<Holding[]> {
 }
 
 /**
- * Fetch tx stats — first tx date + cost basis (sum of all incoming USD value).
- * Internal transfers antar wallet user di-skip otomatis (kalo lo daftarin
- * multi-wallet, transfer antar mereka ga keitung sebagai deposit baru).
+ * Fetch tx stats:
+ * - firstTxDate: tanggal tx pertama (untuk "Active since")
+ * - totalReceivedUsd: sum semua incoming value (kalo mode "auto")
+ * - firstDepositUsd: USD value cuma deposit pertama (kalo mode "first_deposit")
  */
 async function fetchTxStats(
   address: string,
   ownAddresses: Set<string>,
-): Promise<{ firstTxDate: Date | null; costBasisUsd: number; txCount: number }> {
+): Promise<{
+  firstTxDate: Date | null;
+  totalReceivedUsd: number;
+  firstDepositUsd: number;
+  txCount: number;
+}> {
   const url = `${ZERION_BASE}/wallets/${address}/transactions/?currency=usd&page[size]=100`;
   try {
     const res = await fetch(url, {
@@ -88,42 +94,70 @@ async function fetchTxStats(
     });
     if (!res.ok) {
       console.log(`[Portfolio]   txStats ${address}: HTTP ${res.status}`);
-      return { firstTxDate: null, costBasisUsd: 0, txCount: 0 };
+      return {
+        firstTxDate: null,
+        totalReceivedUsd: 0,
+        firstDepositUsd: 0,
+        txCount: 0,
+      };
     }
     const json = await res.json();
     const txs = json.data ?? [];
 
-    let earliest: Date | null = null;
-    let totalReceived = 0;
+    // Collect all incoming external transfers dengan timestamp
+    type Inflow = { date: Date; valueUsd: number };
+    const inflows: Inflow[] = [];
 
     for (const tx of txs) {
       const attr = tx.attributes ?? {};
       const minedAt = attr.mined_at;
-      if (minedAt) {
-        const d = new Date(minedAt);
-        if (!earliest || d < earliest) earliest = d;
-      }
+      if (!minedAt) continue;
+      const txDate = new Date(minedAt);
 
       const transfers = attr.transfers ?? [];
       for (const t of transfers) {
-        const direction = t.direction;
-        if (direction !== "in") continue;
+        if (t.direction !== "in") continue;
 
-        // Skip internal transfer dari wallet user sendiri
         const senderAddr = (t.sender ?? t.sender_address ?? "").toLowerCase();
         if (senderAddr && ownAddresses.has(senderAddr)) continue;
 
         const value = Number(t.value ?? 0);
         if (Number.isFinite(value) && value > 0) {
-          totalReceived += value;
+          inflows.push({ date: txDate, valueUsd: value });
         }
       }
     }
 
-    return { firstTxDate: earliest, costBasisUsd: totalReceived, txCount: txs.length };
+    if (inflows.length === 0) {
+      return {
+        firstTxDate: null,
+        totalReceivedUsd: 0,
+        firstDepositUsd: 0,
+        txCount: txs.length,
+      };
+    }
+
+    // Sort by date asc
+    inflows.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    const earliest = inflows[0].date;
+    const firstDepositUsd = inflows[0].valueUsd;
+    const totalReceivedUsd = inflows.reduce((s, i) => s + i.valueUsd, 0);
+
+    return {
+      firstTxDate: earliest,
+      totalReceivedUsd,
+      firstDepositUsd,
+      txCount: txs.length,
+    };
   } catch (err) {
     console.error(`[Portfolio]   txStats ${address} error:`, err);
-    return { firstTxDate: null, costBasisUsd: 0, txCount: 0 };
+    return {
+      firstTxDate: null,
+      totalReceivedUsd: 0,
+      firstDepositUsd: 0,
+      txCount: 0,
+    };
   }
 }
 
@@ -149,7 +183,8 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
 
   const ownAddresses = new Set(evmAddresses.map((a) => a.toLowerCase()));
   const allHoldings: Holding[] = [];
-  let totalCostBasis = 0;
+  let totalReceived = 0;
+  let firstDepositValue = 0;
   let earliestTx: Date | null = null;
 
   for (const addr of evmAddresses) {
@@ -159,15 +194,17 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
         fetchTxStats(addr, ownAddresses),
       ]);
       console.log(
-        `[Portfolio]   ${addr.slice(0, 10)}... → ${positions.length} positions, ${txStats.txCount} txs, received $${txStats.costBasisUsd.toFixed(2)}, first tx ${txStats.firstTxDate?.toISOString() ?? "none"}`,
+        `[Portfolio]   ${addr.slice(0, 10)}... → ${positions.length} positions, ${txStats.txCount} txs, received $${txStats.totalReceivedUsd.toFixed(2)}, first deposit $${txStats.firstDepositUsd.toFixed(2)}, first tx ${txStats.firstTxDate?.toISOString() ?? "none"}`,
       );
       allHoldings.push(...positions);
-      totalCostBasis += txStats.costBasisUsd;
+      totalReceived += txStats.totalReceivedUsd;
+      // First deposit = yang paling awal across semua wallet
       if (
         txStats.firstTxDate &&
         (!earliestTx || txStats.firstTxDate < earliestTx)
       ) {
         earliestTx = txStats.firstTxDate;
+        firstDepositValue = txStats.firstDepositUsd;
       }
     } catch (err) {
       console.error(`[Portfolio]   ${addr} FAILED:`, err);
@@ -204,14 +241,22 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
   );
   const change24hPct = totalValue > 0 ? (change24hUsd / totalValue) * 100 : 0;
 
-  const costBasis =
-    config.costBasis.mode === "manual"
-      ? config.costBasis.manualValue
-      : totalCostBasis;
+  let costBasis: number;
+  if (config.costBasis.mode === "manual") {
+    costBasis = config.costBasis.manualValue;
+  } else if (config.costBasis.mode === "first_deposit") {
+    costBasis = firstDepositValue;
+  } else {
+    // "auto" — sum semua incoming
+    costBasis = totalReceived;
+  }
+
   const allTimePnl = totalValue - costBasis;
   const allTimePct = costBasis > 0 ? (allTimePnl / costBasis) * 100 : 0;
 
-  console.log(`[Portfolio] → Total: $${totalValue.toFixed(2)}, ${merged.length} holdings\n`);
+  console.log(
+    `[Portfolio] → Total: $${totalValue.toFixed(2)}, basis: $${costBasis.toFixed(2)} (${config.costBasis.mode}), P&L: $${allTimePnl.toFixed(2)}\n`,
+  );
 
   return {
     totalValueUsd: totalValue,

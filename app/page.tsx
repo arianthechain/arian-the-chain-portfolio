@@ -1,7 +1,7 @@
 import { fetchPortfolio } from "@/lib/zerion";
 import { PortfolioCard } from "@/components/PortfolioCard";
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 export default async function Home() {
   const data = await fetchPortfolio();

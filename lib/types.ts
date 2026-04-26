@@ -50,7 +50,7 @@ export type AppConfig = {
   profile: ProfileConfig;
   wallets: WalletConfig;
   costBasis: {
-    mode: "auto" | "manual";
+    mode: "auto" | "first_deposit" | "manual";
     manualValue: number;
   };
   manualHoldings: ManualHolding[];

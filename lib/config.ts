@@ -1,9 +1,11 @@
 import type { AppConfig } from "./types";
 
+const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+
 /**
  * Edit di sini — semua konfigurasi profile, wallet, dan override manual.
  */
-export const config: AppConfig = {
+const _config: AppConfig = {
   profile: {
     name: "Arian the Chain",
     handle: "arianthechain",
@@ -26,13 +28,14 @@ export const config: AppConfig = {
   },
 
   /**
-   * Cost basis = total uang fiat yang pernah masuk.
-   * - "auto" → ambil dari Zerion P&L endpoint (auto-detect dari tx history)
-   * - "manual" → pakai manualValue di bawah
+   * Cost basis = anchor untuk hitung P&L.
+   * - "auto" → sum semua incoming tx (cost basis nambah tiap top up)
+   * - "first_deposit" → pake deposit pertama doang sebagai anchor (top up berikutnya = P&L)
+   * - "manual" → pakai manualValue di bawah (fixed)
    */
   costBasis: {
-    mode: "auto",
-    manualValue: 485000,
+    mode: "first_deposit",
+    manualValue: 30,
   },
 
   /**
@@ -52,3 +55,14 @@ export const config: AppConfig = {
     // },
   ],
 };
+
+// Validate EVM addresses biar fail-fast kalo ada yang typo
+for (const addr of _config.wallets.evm) {
+  if (!EVM_ADDRESS_RE.test(addr)) {
+    throw new Error(
+      `Invalid EVM address di config: "${addr}". Harus format 0x + 40 hex chars.`,
+    );
+  }
+}
+
+export const config = _config;

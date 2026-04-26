@@ -2,23 +2,29 @@ import type { PortfolioData } from "@/lib/types";
 import { config } from "@/lib/config";
 import { SyncTime } from "./SyncTime";
 
-const fmtUsd = (n: number, opts?: { compact?: boolean }) => {
-  if (opts?.compact && Math.abs(n) >= 1000) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(n);
-  }
+// Clamp tiny values ke 0 biar ga muncul "-$0" atau "-0.00%" yang aneh
+const clamp = (n: number, threshold = 0.5) =>
+  Math.abs(n) < threshold ? 0 : n;
+
+const fmtUsd = (n: number) => {
+  const clean = clamp(n);
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(clean);
 };
 
-const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+const fmtPct = (n: number) => {
+  const clean = Math.abs(n) < 0.01 ? 0 : n;
+  return `${clean > 0 ? "+" : ""}${clean.toFixed(2)}%`;
+};
+
+const fmtSignedUsd = (n: number) => {
+  const clean = clamp(n);
+  if (clean === 0) return "$0";
+  return `${clean > 0 ? "+" : ""}${fmtUsd(clean)}`;
+};
 
 function activeSinceText(
   data: PortfolioData,
@@ -38,10 +44,25 @@ function activeSinceText(
 
 export function PortfolioCard({ data }: { data: PortfolioData }) {
   const { profile } = config;
-  const positive24h = data.change24hPct >= 0;
-  const positiveAllTime = data.allTimePnlUsd >= 0;
   const visibleHoldings = data.holdings.slice(0, 6);
   const totalValue = data.totalValueUsd || 1;
+
+  const cleanPnl = clamp(data.allTimePnlUsd);
+  const cleanPct24h = Math.abs(data.change24hPct) < 0.01 ? 0 : data.change24hPct;
+  const cleanPctAll = Math.abs(data.allTimePnlPct) < 0.01 ? 0 : data.allTimePnlPct;
+
+  const colorChange24h =
+    cleanPct24h > 0
+      ? "text-emerald-400"
+      : cleanPct24h < 0
+        ? "text-red-400"
+        : "text-white/50";
+  const colorAllTime =
+    cleanPnl > 0
+      ? "text-emerald-400"
+      : cleanPnl < 0
+        ? "text-red-400"
+        : "text-white/70";
 
   return (
     <div className="card-holo rounded-[14px] p-[1.5px]">
@@ -91,12 +112,8 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <p className="font-display text-[32px] text-white leading-none tracking-tight">
             {fmtUsd(data.totalValueUsd)}
           </p>
-          <p
-            className={`text-[11px] mt-1.5 ${
-              positive24h ? "text-emerald-400" : "text-red-400"
-            }`}
-          >
-            {fmtPct(data.change24hPct)} today · {fmtPct(data.allTimePnlPct)} all-time
+          <p className={`text-[11px] mt-1.5 ${colorChange24h}`}>
+            {fmtPct(cleanPct24h)} today · {fmtPct(cleanPctAll)} all-time
           </p>
         </div>
 
@@ -108,8 +125,8 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <Stat label="Cost basis" value={fmtUsd(data.costBasisUsd)} />
           <Stat
             label="All-time P&L"
-            value={`${positiveAllTime ? "+" : ""}${fmtUsd(data.allTimePnlUsd)}`}
-            valueClass={positiveAllTime ? "text-emerald-400" : "text-red-400"}
+            value={fmtSignedUsd(data.allTimePnlUsd)}
+            valueClass={colorAllTime}
           />
           <Stat label="Active since" value={activeSinceText(data, profile)} />
           <Stat label="Holdings" value={`${data.holdings.length} assets`} />
@@ -179,10 +196,10 @@ function Stat({
 function Verified() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-label="Verified">
-      <circle cx="12" cy="12" r="10" fill="#d4af37" />
+      <circle cx="12" cy="12" r="10" fill="#1d9bf0" />
       <path
         d="M7.5 12.5l3 3 6-7"
-        stroke="#0a0b14"
+        stroke="white"
         strokeWidth="2.4"
         fill="none"
         strokeLinecap="round"
