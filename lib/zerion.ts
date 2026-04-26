@@ -91,12 +91,15 @@ async function fetchSolanaPositions(address: string): Promise<Holding[]> {
       ).toUpperCase();
       const name = item.content?.metadata?.name || symbol;
       const style = tokenStyle(symbol);
+      const priceUsd = Number(tokenInfo.price_info?.price_per_token ?? 0);
 
       holdings.push({
         symbol,
         name,
         amount: balance,
+        priceUsd,
         valueUsd,
+        change24h: 0,
         iconChar: style.char,
         color: style.color,
       });
@@ -127,11 +130,14 @@ async function fetchSolanaPositions(address: string): Promise<Holding[]> {
 
       if (solValue >= 0.01) {
         const style = tokenStyle("SOL");
+        const priceUsd = solAmount > 0 ? solValue / solAmount : 0;
         holdings.push({
           symbol: "SOL",
           name: "Solana",
           amount: solAmount,
+          priceUsd,
           valueUsd: solValue,
+          change24h: 0,
           iconChar: style.char,
           color: style.color,
         });
