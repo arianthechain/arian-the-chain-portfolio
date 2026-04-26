@@ -39,6 +39,13 @@ function activeSinceText(
       year: "numeric",
     });
   }
+  // Fallback: kalo ada holdings tapi tx history ga ke-detect, pake current month
+  if (data.holdings.length > 0) {
+    return new Date().toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+  }
   return "—";
 }
 
@@ -48,7 +55,8 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
   const totalValue = data.totalValueUsd || 1;
 
   const cleanPnl = clamp(data.allTimePnlUsd);
-  const cleanPct24h = Math.abs(data.change24hPct) < 0.01 ? 0 : data.change24hPct;
+  // Hide tiny 24h fluctuation (< 0.5%, biasanya stablecoin noise)
+  const cleanPct24h = Math.abs(data.change24hPct) < 0.5 ? 0 : data.change24hPct;
   const cleanPctAll = Math.abs(data.allTimePnlPct) < 0.01 ? 0 : data.allTimePnlPct;
 
   const colorChange24h =
@@ -58,9 +66,9 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
         ? "text-red-400"
         : "text-white/50";
   const colorAllTime =
-    cleanPnl > 0
+    cleanPctAll > 0
       ? "text-emerald-400"
-      : cleanPnl < 0
+      : cleanPctAll < 0
         ? "text-red-400"
         : "text-white/70";
 
@@ -112,8 +120,10 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <p className="font-display text-[32px] text-white leading-none tracking-tight">
             {fmtUsd(data.totalValueUsd)}
           </p>
-          <p className={`text-[11px] mt-1.5 ${colorChange24h}`}>
-            {fmtPct(cleanPct24h)} today · {fmtPct(cleanPctAll)} all-time
+          <p className="text-[11px] mt-1.5 text-white/50">
+            <span className={colorChange24h}>{fmtPct(cleanPct24h)} today</span>
+            <span className="text-white/30 mx-1.5">·</span>
+            <span className={colorAllTime}>{fmtPct(cleanPctAll)} all-time</span>
           </p>
         </div>
 
