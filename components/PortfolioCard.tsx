@@ -51,7 +51,14 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
   const visibleHoldings = data.holdings.slice(0, 6);
   const totalValue = data.totalValueUsd || 1;
 
-  const cleanPctAll = Math.abs(data.allTimePnlPct) < 0.01 ? 0 : data.allTimePnlPct;
+  // Recalculate pct dari rounded display values biar konsisten ke mata
+  // (e.g. $40 - $30 = $10 → +33.33%, bukan +33.27% dari nilai mentah)
+  const displayedTotal = Math.round(data.totalValueUsd);
+  const displayedBasis = Math.round(data.costBasisUsd);
+  const displayedPnl = displayedTotal - displayedBasis;
+  const displayedPct =
+    displayedBasis > 0 ? (displayedPnl / displayedBasis) * 100 : 0;
+  const cleanPctAll = Math.abs(displayedPct) < 0.01 ? 0 : displayedPct;
 
   const colorAllTime =
     cleanPctAll > 0
