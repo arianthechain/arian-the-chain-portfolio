@@ -31,6 +31,124 @@ function authHeader(): string {
 }
 
 /**
+ * Fetch Solana positions via Helius DAS API.
+ * Free tier: helius.dev → 100k req/bulan.
+ */
+async function fetchSolanaPositions(address: string): Promise<Holding[]> {
+  const apiKey = process.env.HELIUS_API_KEY;
+  if (!apiKey) {
+    console.warn("[Solana] HELIUS_API_KEY not set, skipping Solana fetch");
+    return [];
+  }
+
+  const url = `https://mainnet.helius-rpc.com/?api-key=${apiKey}`;
+  const holdings: Holding[] = [];
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "portfolio",
+        method: "getAssetsByOwner",
+        params: {
+          ownerAddress: address,
+          page: 1,
+          limit: 1000,
+          displayOptions: {
+            showFungible: true,
+            showNativeBalance: true,
+          },
+        },
+      }),
+      next: { revalidate: 60 },
+    });
+
+    if (!res.ok) {
+      console.error(`[Solana] Helius HTTP ${res.status}`);
+      return [];
+    }
+
+    const json = await res.json();
+    const result = json?.result ?? {};
+    const items: any[] = result.items ?? [];
+
+    // SPL fungible tokens
+    for (const item of items) {
+      if (item.interface !== "FungibleToken" && item.interface !== "FungibleAsset") {
+        continue;
+      }
+      const tokenInfo = item.token_info ?? {};
+      const decimals = Number(tokenInfo.decimals ?? 0);
+      const balance = Number(tokenInfo.balance ?? 0) / Math.pow(10, decimals);
+      const valueUsd = Number(tokenInfo.price_info?.total_price ?? 0);
+
+      if (valueUsd < 0.01) continue;
+
+      const symbol = String(
+        tokenInfo.symbol || item.content?.metadata?.symbol || "?",
+      ).toUpperCase();
+      const name = item.content?.metadata?.name || symbol;
+      const style = tokenStyle(symbol);
+
+      holdings.push({
+        symbol,
+        name,
+        amount: balance,
+        valueUsd,
+        iconChar: style.char,
+        color: style.color,
+      });
+    }
+
+    // Native SOL
+    const nativeBalance = result.nativeBalance;
+    if (nativeBalance) {
+      const lamports = Number(nativeBalance.lamports ?? 0);
+      const solAmount = lamports / 1e9;
+      let solValue = Number(nativeBalance.total_price ?? 0);
+
+      // Kalo Helius ga return price, fallback ke CoinGecko
+      if (solValue === 0 && solAmount > 0.0001) {
+        try {
+          const priceRes = await fetch(
+            "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd",
+            { next: { revalidate: 300 } },
+          );
+          if (priceRes.ok) {
+            const p = await priceRes.json();
+            solValue = solAmount * Number(p?.solana?.usd ?? 0);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (solValue >= 0.01) {
+        const style = tokenStyle("SOL");
+        holdings.push({
+          symbol: "SOL",
+          name: "Solana",
+          amount: solAmount,
+          valueUsd: solValue,
+          iconChar: style.char,
+          color: style.color,
+        });
+      }
+    }
+
+    console.log(
+      `[Solana]   ${address.slice(0, 10)}... → ${holdings.length} positions`,
+    );
+  } catch (err) {
+    console.error(`[Solana]   ${address} FAILED:`, err);
+  }
+
+  return holdings;
+}
+
+/**
  * Fetch positions (holdings) untuk satu wallet EVM.
  * Zerion handle multi-chain otomatis di endpoint ini.
  */
@@ -181,7 +299,7 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
     return mockPortfolio();
   }
 
-  console.log("[Portfolio] → Fetching REAL data from Zerion...\n");
+  console.log("[Portfolio] → Fetching REAL data...\n");
 
   const ownAddresses = new Set(allAddresses.map((a) => a.toLowerCase()));
   const allHoldings: Holding[] = [];
@@ -189,18 +307,18 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
   let firstDepositValue = 0;
   let earliestTx: Date | null = null;
 
-  for (const addr of allAddresses) {
+  // EVM via Zerion
+  for (const addr of evmAddresses) {
     try {
       const [positions, txStats] = await Promise.all([
         fetchPositions(addr),
         fetchTxStats(addr, ownAddresses),
       ]);
       console.log(
-        `[Portfolio]   ${addr.slice(0, 10)}... → ${positions.length} positions, ${txStats.txCount} txs, received $${txStats.totalReceivedUsd.toFixed(2)}, first deposit $${txStats.firstDepositUsd.toFixed(2)}, first tx ${txStats.firstTxDate?.toISOString() ?? "none"}`,
+        `[Portfolio] EVM ${addr.slice(0, 10)}... → ${positions.length} positions, ${txStats.txCount} txs, received $${txStats.totalReceivedUsd.toFixed(2)}, first deposit $${txStats.firstDepositUsd.toFixed(2)}, first tx ${txStats.firstTxDate?.toISOString() ?? "none"}`,
       );
       allHoldings.push(...positions);
       totalReceived += txStats.totalReceivedUsd;
-      // First deposit = yang paling awal across semua wallet
       if (
         txStats.firstTxDate &&
         (!earliestTx || txStats.firstTxDate < earliestTx)
@@ -209,7 +327,17 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
         firstDepositValue = txStats.firstDepositUsd;
       }
     } catch (err) {
-      console.error(`[Portfolio]   ${addr} FAILED:`, err);
+      console.error(`[Portfolio] EVM ${addr} FAILED:`, err);
+    }
+  }
+
+  // Solana via Helius
+  for (const addr of solanaAddresses) {
+    try {
+      const positions = await fetchSolanaPositions(addr);
+      allHoldings.push(...positions);
+    } catch (err) {
+      console.error(`[Portfolio] Solana ${addr} FAILED:`, err);
     }
   }
 
