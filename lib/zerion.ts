@@ -245,10 +245,11 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
   if (config.costBasis.mode === "manual") {
     costBasis = config.costBasis.manualValue;
   } else if (config.costBasis.mode === "first_deposit") {
-    costBasis = firstDepositValue;
+    // Auto-detect dari tx history. Kalo Zerion ga return data, fallback ke manualValue.
+    costBasis = firstDepositValue || config.costBasis.manualValue;
   } else {
-    // "auto" — sum semua incoming
-    costBasis = totalReceived;
+    // "auto" — sum semua incoming, fallback ke manualValue kalo gagal
+    costBasis = totalReceived || config.costBasis.manualValue;
   }
 
   const allTimePnl = totalValue - costBasis;
