@@ -30,22 +30,19 @@ function activeSinceText(
   data: PortfolioData,
   profile: typeof config.profile,
 ): string {
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
   // Manual override pertama kalo di-set
   if (profile.activeSince) return profile.activeSince;
   // Auto-detect dari tx pertama
-  if (data.firstSeenAt) {
-    return new Date(data.firstSeenAt).toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-    });
-  }
-  // Fallback: kalo ada holdings tapi tx history ga ke-detect, pake current month
-  if (data.holdings.length > 0) {
-    return new Date().toLocaleDateString("en-US", {
-      month: "short",
-      year: "numeric",
-    });
-  }
+  if (data.firstSeenAt) return fmt(new Date(data.firstSeenAt));
+  // Fallback: kalo ada holdings tapi tx history ga ke-detect, pake hari ini
+  if (data.holdings.length > 0) return fmt(new Date());
   return "—";
 }
 
@@ -54,17 +51,8 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
   const visibleHoldings = data.holdings.slice(0, 6);
   const totalValue = data.totalValueUsd || 1;
 
-  const cleanPnl = clamp(data.allTimePnlUsd);
-  // Hide tiny 24h fluctuation (< 0.5%, biasanya stablecoin noise)
-  const cleanPct24h = Math.abs(data.change24hPct) < 0.5 ? 0 : data.change24hPct;
   const cleanPctAll = Math.abs(data.allTimePnlPct) < 0.01 ? 0 : data.allTimePnlPct;
 
-  const colorChange24h =
-    cleanPct24h > 0
-      ? "text-emerald-400"
-      : cleanPct24h < 0
-        ? "text-red-400"
-        : "text-white/50";
   const colorAllTime =
     cleanPctAll > 0
       ? "text-emerald-400"
@@ -120,11 +108,6 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           <p className="font-display text-[32px] text-white leading-none tracking-tight">
             {fmtUsd(data.totalValueUsd)}
           </p>
-          <p className="text-[11px] mt-1.5 text-white/50">
-            <span className={colorChange24h}>{fmtPct(cleanPct24h)} today</span>
-            <span className="text-white/30 mx-1.5">·</span>
-            <span className={colorAllTime}>{fmtPct(cleanPctAll)} all-time</span>
-          </p>
         </div>
 
         {/* Stats */}
@@ -134,20 +117,26 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
           </p>
           <Stat label="Cost basis" value={fmtUsd(data.costBasisUsd)} />
           <Stat
-            label="All-time P&L"
-            value={fmtSignedUsd(data.allTimePnlUsd)}
+            label="P&L"
+            value={`${fmtSignedUsd(data.allTimePnlUsd)} · ${fmtPct(cleanPctAll)}`}
             valueClass={colorAllTime}
           />
           <Stat label="Active since" value={activeSinceText(data, profile)} />
           <Stat label="Holdings" value={`${data.holdings.length} assets`} />
         </div>
 
-        {/* Holdings grid */}
+        {/* Holdings list */}
         <div className="mb-4">
           <p className="text-[10px] tracking-[0.18em] uppercase text-white/40 font-mono mb-2">
             Holdings
           </p>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+          <div
+            className={
+              visibleHoldings.length <= 2
+                ? "flex flex-col gap-1.5"
+                : "grid grid-cols-2 gap-x-3 gap-y-1.5"
+            }
+          >
             {visibleHoldings.map((h) => {
               const pct = (h.valueUsd / totalValue) * 100;
               return (
@@ -164,6 +153,8 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
                   </span>
                   <span className="text-white/90">{h.symbol}</span>
                   <span className="ml-auto text-white/40 font-mono">
+                    {fmtUsd(h.valueUsd)}
+                    <span className="text-white/30 mx-1.5">·</span>
                     {pct.toFixed(1)}%
                   </span>
                 </div>
