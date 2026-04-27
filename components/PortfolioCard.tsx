@@ -50,7 +50,7 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
   const { profile } = config;
   const visibleHoldings = data.holdings
     .filter((h) => h.valueUsd >= 0.5)
-    .slice(0, 6);
+    .slice(0, 8);
   const totalValue = data.totalValueUsd || 1;
 
   // Recalculate pct dari rounded display values biar konsisten ke mata
@@ -155,15 +155,15 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
             Holdings
           </p>
           <div className="flex flex-col gap-1.5">
-            {visibleHoldings.map((h) => {
+            {visibleHoldings.map((h, idx) => {
               const valueRounded = Math.round(h.valueUsd);
               const pct =
                 displayedTotal > 0 ? (valueRounded / displayedTotal) * 100 : 0;
               return (
                 <div
-                  key={h.symbol}
+                  key={`${h.symbol}-${h.isLocked ? "locked" : "free"}-${idx}`}
                   className="flex items-center gap-2 text-[11px]"
-                  title={h.isLocked ? `${h.location}` : `${h.amount} ${h.symbol}`}
+                  title={h.isLocked ? `Locked at ${h.location}` : `${h.amount} ${h.symbol}`}
                 >
                   <span
                     className="w-[18px] h-[18px] rounded-full flex items-center justify-center text-[9px] font-medium text-white shrink-0"

@@ -1,5 +1,6 @@
 import type { Holding, PortfolioData } from "./types";
 import { config } from "./config";
+import { fetchJupLockHoldings } from "./jupLock";
 
 const ZERION_BASE = "https://api.zerion.io/v1";
 
@@ -345,6 +346,16 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
       allHoldings.push(...positions);
     } catch (err) {
       console.error(`[Portfolio] Solana ${addr} FAILED:`, err);
+    }
+  }
+
+  // Jupiter Lock — locked tokens (separate row, ga merge)
+  if (solanaAddresses.length > 0) {
+    try {
+      const locked = await fetchJupLockHoldings(solanaAddresses);
+      allHoldings.push(...locked);
+    } catch (err) {
+      console.error("[Portfolio] Jup Lock FAILED:", err);
     }
   }
 
