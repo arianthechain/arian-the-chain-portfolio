@@ -62,12 +62,9 @@ const _config: AppConfig = {
 
   /**
    * Target / goal — opsional. Set ke undefined buat hide section.
+   * Contoh: target: { name: "BMW M3", priceUsd: 95000 }
    */
-  target: {
-    name: "BMW M3 Razor",
-    priceUsd: 95000,
-    // tagline: "the dream", // opsional
-  },
+  target: undefined,
 };
 
 // Validate addresses biar fail-fast kalo ada yang typo
