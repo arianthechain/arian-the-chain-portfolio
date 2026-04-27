@@ -14,6 +14,10 @@ const _config: AppConfig = {
     activeSince: "", // kosong = auto-detect dari tx pertama; isi manual misal "Jan 2021" untuk override
     domain: "arianthechain.com",
     twitter: "arianthechain", // X handle tanpa @, set "" untuk disable link
+    strategy: {
+      code: "330",
+      label: "Strategist",
+    },
   },
 
   wallets: {
@@ -55,6 +59,15 @@ const _config: AppConfig = {
     //   location: "Custom vesting contract",
     // },
   ],
+
+  /**
+   * Target / goal — opsional. Set ke undefined buat hide section.
+   */
+  target: {
+    name: "BMW M3 Razor",
+    priceUsd: 95000,
+    // tagline: "the dream", // opsional
+  },
 };
 
 // Validate addresses biar fail-fast kalo ada yang typo

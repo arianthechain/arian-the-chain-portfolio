@@ -105,6 +105,17 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
               <>/u/{profile.handle}</>
             )}
           </p>
+          {profile.strategy && (
+            <div className="inline-flex items-center gap-1.5 mt-3.5 px-2.5 py-1 border border-gold-400/40 bg-gold-400/[0.08] rounded relative z-10">
+              <span className="font-mono text-[10px] tracking-[0.18em] text-gold-400 font-semibold">
+                {profile.strategy.code}
+              </span>
+              <span className="w-px h-2 bg-gold-400/30" />
+              <span className="font-mono text-[9px] tracking-[0.15em] uppercase text-gold-400/70">
+                {profile.strategy.label}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Net worth */}
@@ -169,6 +180,64 @@ export function PortfolioCard({ data }: { data: PortfolioData }) {
             })}
           </div>
         </div>
+
+        {/* Target */}
+        {config.target && (() => {
+          const t = config.target;
+          const progressPct = Math.min(
+            (data.totalValueUsd / t.priceUsd) * 100,
+            100,
+          );
+          const remaining = Math.max(t.priceUsd - data.totalValueUsd, 0);
+          const fmtBigUsd = (n: number) =>
+            new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+              maximumFractionDigits: 0,
+            }).format(n);
+          return (
+            <div className="mb-4 pt-3 border-t border-white/5">
+              <div className="flex items-center justify-between mb-2.5">
+                <p className="text-[10px] tracking-[0.18em] uppercase text-white/40 font-mono">
+                  Target
+                </p>
+                <p className="text-[10px] tracking-[0.18em] uppercase text-gold-400 font-mono">
+                  {progressPct.toFixed(2)}%
+                </p>
+              </div>
+              <div className="flex items-baseline justify-between mb-1">
+                <p className="font-display text-[15px] text-white/95">{t.name}</p>
+                <p className="text-[12px] text-white/70 font-mono">
+                  {fmtBigUsd(t.priceUsd)}
+                </p>
+              </div>
+              {t.tagline && (
+                <p className="text-[10px] text-white/40 font-mono mb-2.5">
+                  {t.tagline}
+                </p>
+              )}
+              <div className="h-[5px] bg-white/[0.06] rounded-full overflow-hidden mt-2 mb-1.5">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.max(progressPct, 0.5)}%`,
+                    background:
+                      "linear-gradient(90deg, #d4af37 0%, #f5c837 50%, #d4af37 100%)",
+                    boxShadow: "0 0 6px rgba(212,175,55,0.6)",
+                  }}
+                />
+              </div>
+              <div className="flex justify-between font-mono text-[10px]">
+                <span className="text-white/50">
+                  {fmtUsd(data.totalValueUsd)} / {fmtBigUsd(t.priceUsd)}
+                </span>
+                <span className="text-white/40">
+                  {fmtBigUsd(remaining)} to go
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Footer */}
         <div className="flex justify-between pt-3 border-t border-white/5 text-[9px] tracking-[0.15em] uppercase text-white/30 font-mono">

@@ -30,6 +30,10 @@ export type ProfileConfig = {
   activeSince: string; // "Jan 2021"
   domain: string;
   twitter?: string; // X handle tanpa @, misal "arianthechain"
+  strategy?: {
+    code: string; // "330"
+    label: string; // "Strategist"
+  };
 };
 
 export type WalletConfig = {
@@ -46,6 +50,12 @@ export type ManualHolding = {
   location: string;
 };
 
+export type Target = {
+  name: string;
+  priceUsd: number;
+  tagline?: string;
+};
+
 export type AppConfig = {
   profile: ProfileConfig;
   wallets: WalletConfig;
@@ -54,4 +64,5 @@ export type AppConfig = {
     manualValue: number;
   };
   manualHoldings: ManualHolding[];
+  target?: Target;
 };
