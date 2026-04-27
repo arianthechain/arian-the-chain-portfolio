@@ -46,17 +46,19 @@ const _config: AppConfig = {
   /**
    * Holdings yang ga ke-detect API:
    * - Aset di CEX (Binance, Bybit, dll)
-   * - Locked di custom contract yang belum di-index
    * - Off-chain custody
+   *
+   * NOTE: Locked tokens auto-detect di Solana (Jupiter Lock + SatoshiLock V1/V2)
+   * dan Ethereum (SatoshiLock V3) — ga perlu manual entry.
    */
   manualHoldings: [
     // Contoh:
     // {
-    //   symbol: "ETH",
-    //   name: "Ethereum (locked)",
-    //   amount: 50,
-    //   valueUsd: 116000,
-    //   location: "Custom vesting contract",
+    //   symbol: "USDC",
+    //   name: "USDC (CEX)",
+    //   amount: 5000,
+    //   valueUsd: 5000,
+    //   location: "Binance",
     // },
   ],
 

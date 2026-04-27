@@ -1,7 +1,7 @@
 import type { Holding, PortfolioData } from "./types";
 import { config } from "./config";
-import { fetchJupLockHoldings } from "./jupLock";
-import { fetchSatoshiLockHoldings } from "./satoshiLock";
+import { fetchSolanaLocks } from "./solanaLocks";
+import { fetchEvmLocks } from "./evmLocks";
 
 const ZERION_BASE = "https://api.zerion.io/v1";
 
@@ -350,23 +350,23 @@ export async function fetchPortfolio(): Promise<PortfolioData> {
     }
   }
 
-  // Jupiter Lock — locked tokens (Solana side)
+  // Solana locks (Jupiter Lock + SatoshiLock V1/V2)
   if (solanaAddresses.length > 0) {
     try {
-      const locked = await fetchJupLockHoldings(solanaAddresses);
+      const locked = await fetchSolanaLocks(solanaAddresses);
       allHoldings.push(...locked);
     } catch (err) {
-      console.error("[Portfolio] Jup Lock FAILED:", err);
+      console.error("[Portfolio] Solana locks FAILED:", err);
     }
   }
 
-  // SatoshiLock — locked ETH/ERC20 (EVM side)
+  // EVM locks (SatoshiLock V3 di Ethereum)
   if (evmAddresses.length > 0) {
     try {
-      const locked = await fetchSatoshiLockHoldings(evmAddresses);
+      const locked = await fetchEvmLocks(evmAddresses);
       allHoldings.push(...locked);
     } catch (err) {
-      console.error("[Portfolio] SatoshiLock FAILED:", err);
+      console.error("[Portfolio] EVM locks FAILED:", err);
     }
   }
 
