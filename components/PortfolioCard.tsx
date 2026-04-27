@@ -48,7 +48,9 @@ function activeSinceText(
 
 export function PortfolioCard({ data }: { data: PortfolioData }) {
   const { profile } = config;
-  const visibleHoldings = data.holdings.slice(0, 6);
+  const visibleHoldings = data.holdings
+    .filter((h) => h.valueUsd >= 0.5)
+    .slice(0, 6);
   const totalValue = data.totalValueUsd || 1;
 
   // Recalculate pct dari rounded display values biar konsisten ke mata

@@ -22,10 +22,10 @@ const _config: AppConfig = {
 
   wallets: {
     evm: [
-      "0x9bA0f2565c532F4a5efe40AAc914163594f8e468",
+      "0x1503E5acb203e1C19ad490f34D19271127493E3a",
     ],
     solana: [
-      "2hyyf9pJAMB78VjWJ8JLZnhYtXt7ApBbSD1U2Qa2Rc1X",
+      "5u7ngES9qymhkQqVRPWYoBfXGSrEjveM2EZcWuRwcJgA",
     ],
     bitcoin: [
       // Tambah address Bitcoin lo
