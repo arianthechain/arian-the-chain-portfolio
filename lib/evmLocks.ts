@@ -173,13 +173,12 @@ export async function fetchEvmLocks(
       for (const lockId of lockIds) {
         try {
           const lockIdNoPrefix = stripHex(lockId);
-          const [lockHex, claimableHex] = await Promise.all([
-            ethCallWithFallback(SATOSHILOCK_V3, SEL_GET_LOCK + lockIdNoPrefix),
-            ethCallWithFallback(
-              SATOSHILOCK_V3,
-              SEL_CLAIMABLE + lockIdNoPrefix,
-            ),
-          ]);
+
+          // getLock harus berhasil, kalo revert berarti lockId invalid
+          const lockHex = await ethCallWithFallback(
+            SATOSHILOCK_V3,
+            SEL_GET_LOCK + lockIdNoPrefix,
+          );
 
           const lock = decodeLock(lockHex);
           if (!lock) {
@@ -188,9 +187,21 @@ export async function fetchEvmLocks(
             );
             continue;
           }
-          const claimable = BigInt(
-            "0x" + (stripHex(claimableHex) || "0"),
-          );
+
+          // claimable() bisa revert kalo lock belum mulai (startTime di masa depan)
+          // atau cliff belum habis. Kalo revert → assume nothing claimable yet.
+          let claimable = 0n;
+          try {
+            const claimableHex = await ethCallWithFallback(
+              SATOSHILOCK_V3,
+              SEL_CLAIMABLE + lockIdNoPrefix,
+            );
+            claimable = BigInt("0x" + (stripHex(claimableHex) || "0"));
+          } catch (claimErr) {
+            console.log(
+              `[SatoshiLock-V3]   lock ${lockId.slice(0, 12)}: claimable() reverted (likely not started yet) — treating as 0`,
+            );
+          }
 
           const stillLocked =
             lock.totalAmount - lock.withdrawnAmount - claimable;
