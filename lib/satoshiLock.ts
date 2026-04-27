@@ -14,7 +14,11 @@
 
 import type { Holding } from "./types";
 
-const SATOSHILOCK_ADDRESS = "0xf8cBE46f0619471fAf313aed509FC0d0c8fC3683";
+const SATOSHILOCK_ADDRESSES = [
+  "0xf8cBE46f0619471fAf313aed509FC0d0c8fC3683", // SatoshiLock latest (1 hari)
+  "0xd40febe77b4a9bde56e13cf4067638b98a061925", // SatoshiLockV2 (3 hari)
+  "0xbd1d35b574361632ec2cc1376dcd346741997474", // SatoshiLock V1 (4 hari)
+];
 const RPC_URL = "https://ethereum-rpc.publicnode.com";
 
 const SEL_GET_LOCKS_BY_RECIPIENT = "0x858e8af4";
@@ -43,7 +47,7 @@ function readAddress(hex: string, slot: number): string {
   return "0x" + slice.slice(24).toLowerCase();
 }
 
-async function ethCall(data: string): Promise<string> {
+async function ethCall(contract: string, data: string): Promise<string> {
   const res = await fetch(RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -51,7 +55,7 @@ async function ethCall(data: string): Promise<string> {
       jsonrpc: "2.0",
       id: 1,
       method: "eth_call",
-      params: [{ to: SATOSHILOCK_ADDRESS, data }, "latest"],
+      params: [{ to: contract, data }, "latest"],
     }),
     next: { revalidate: 60 },
   });
@@ -128,73 +132,81 @@ export async function fetchSatoshiLockHoldings(
   let ethPriceCache: number | null = null;
 
   for (const addr of evmAddresses) {
-    try {
-      const callData =
-        SEL_GET_LOCKS_BY_RECIPIENT + pad(addr.toLowerCase().replace(/^0x/, ""));
-      const lockIdsHex = await ethCall(callData);
-      const lockIds = decodeLockIds(lockIdsHex);
+    for (const contract of SATOSHILOCK_ADDRESSES) {
+      try {
+        const callData =
+          SEL_GET_LOCKS_BY_RECIPIENT +
+          pad(addr.toLowerCase().replace(/^0x/, ""));
+        const lockIdsHex = await ethCall(contract, callData);
+        const lockIds = decodeLockIds(lockIdsHex);
 
-      console.log(
-        `[SatoshiLock] ${addr.slice(0, 10)}... → ${lockIds.length} lock(s)`,
-      );
+        if (lockIds.length === 0) continue;
 
-      if (lockIds.length === 0) continue;
+        console.log(
+          `[SatoshiLock] ${addr.slice(0, 10)}... @ ${contract.slice(0, 10)}... → ${lockIds.length} lock(s)`,
+        );
 
-      for (const lockId of lockIds) {
-        try {
-          const lockIdNoPrefix = stripHex(lockId);
-          const [lockHex, claimableHex] = await Promise.all([
-            ethCall(SEL_GET_LOCK + lockIdNoPrefix),
-            ethCall(SEL_CLAIMABLE + lockIdNoPrefix),
-          ]);
+        for (const lockId of lockIds) {
+          try {
+            const lockIdNoPrefix = stripHex(lockId);
+            const [lockHex, claimableHex] = await Promise.all([
+              ethCall(contract, SEL_GET_LOCK + lockIdNoPrefix),
+              ethCall(contract, SEL_CLAIMABLE + lockIdNoPrefix),
+            ]);
 
-          const lock = decodeLock(lockHex);
-          const claimable = BigInt("0x" + (stripHex(claimableHex) || "0"));
+            const lock = decodeLock(lockHex);
+            const claimable = BigInt("0x" + (stripHex(claimableHex) || "0"));
 
-          const stillLocked =
-            lock.totalAmount - lock.withdrawnAmount - claimable;
-          if (stillLocked <= 0n) continue;
+            const stillLocked =
+              lock.totalAmount - lock.withdrawnAmount - claimable;
+            if (stillLocked <= 0n) continue;
 
-          // Saat ini: cuma support ETH native lock. Untuk ERC20, perlu lookup price terpisah.
-          if (lock.token !== ZERO_ADDR) {
+            if (lock.token !== ZERO_ADDR) {
+              console.log(
+                `[SatoshiLock]   skip ERC20 lock (token=${lock.token}, not yet supported)`,
+              );
+              continue;
+            }
+
+            if (ethPriceCache === null) ethPriceCache = await fetchEthPrice();
+            const priceUsd = ethPriceCache;
+            const decimals = 18;
+            const amountReadable = Number(stillLocked) / Math.pow(10, decimals);
+            const valueUsd = amountReadable * priceUsd;
+
+            if (valueUsd < 0.01 && amountReadable < 0.0001) continue;
+
+            const style = styleFor("ETH");
+
+            results.push({
+              symbol: "ETH",
+              name: "Ethereum",
+              amount: amountReadable,
+              priceUsd,
+              valueUsd,
+              change24h: 0,
+              iconChar: style.char,
+              color: style.color,
+              isLocked: true,
+              location: "SatoshiLock",
+            });
+
             console.log(
-              `[SatoshiLock]   skip ERC20 lock (token=${lock.token}, not yet supported)`,
+              `[SatoshiLock]   → ETH ${amountReadable.toFixed(6)} ($${valueUsd.toFixed(2)}) locked`,
             );
-            continue;
+          } catch (innerErr) {
+            console.error(
+              `[SatoshiLock]   lock ${lockId} @ ${contract.slice(0, 10)} failed:`,
+              String(innerErr),
+            );
           }
-
-          if (ethPriceCache === null) ethPriceCache = await fetchEthPrice();
-          const priceUsd = ethPriceCache;
-          const decimals = 18;
-          const amountReadable = Number(stillLocked) / Math.pow(10, decimals);
-          const valueUsd = amountReadable * priceUsd;
-
-          if (valueUsd < 0.01 && amountReadable < 0.0001) continue;
-
-          const style = styleFor("ETH");
-
-          results.push({
-            symbol: "ETH",
-            name: "Ethereum",
-            amount: amountReadable,
-            priceUsd,
-            valueUsd,
-            change24h: 0,
-            iconChar: style.char,
-            color: style.color,
-            isLocked: true,
-            location: "SatoshiLock",
-          });
-
-          console.log(
-            `[SatoshiLock]   → ETH ${amountReadable.toFixed(6)} ($${valueUsd.toFixed(2)}) locked`,
-          );
-        } catch (innerErr) {
-          console.error(`[SatoshiLock]   lock ${lockId} failed:`, innerErr);
         }
+      } catch (err) {
+        console.error(
+          `[SatoshiLock] ${addr} @ ${contract.slice(0, 10)} failed:`,
+          String(err),
+        );
       }
-    } catch (err) {
-      console.error(`[SatoshiLock] ${addr} failed:`, err);
     }
   }
 

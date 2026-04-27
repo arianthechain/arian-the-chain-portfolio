@@ -222,7 +222,10 @@ export async function fetchJupLockHoldings(
           const dataB64 = acc.account?.data?.[0];
           if (!dataB64) continue;
           const bytes = b64ToBytes(dataB64);
-          if (bytes.length < 216) continue;
+          if (bytes.length < 216) {
+            console.log(`[JupLock]   account too small: ${bytes.length} bytes`);
+            continue;
+          }
 
           // Parse fields
           const tokenMintBytes = bytes.slice(72, 104);
@@ -235,6 +238,11 @@ export async function fetchJupLockHoldings(
           const totalLocked =
             cliffUnlockAmount + amountPerPeriod * numberOfPeriods;
           const stillLocked = Math.max(totalLocked - claimed, 0);
+
+          console.log(
+            `[JupLock]   parsed: mint=${tokenMint.slice(0, 8)} cliff=${cliffUnlockAmount} perPeriod=${amountPerPeriod} periods=${numberOfPeriods} claimed=${claimed} total=${totalLocked} stillLocked=${stillLocked}`,
+          );
+
           if (stillLocked === 0) continue;
 
           // Fetch metadata
