@@ -2,7 +2,6 @@ import type { Holding, PortfolioData } from "./types";
 import { config } from "./config";
 import { fetchJupLockHoldings } from "./jupLock";
 import { fetchSatoshiLockHoldings } from "./satoshiLock";
-import { fetchSatoshiLockHoldings } from "./satoshiLock";
 
 const ZERION_BASE = "https://api.zerion.io/v1";
 
