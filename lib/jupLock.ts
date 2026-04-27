@@ -240,8 +240,14 @@ export async function fetchJupLockHoldings(
           // Fetch metadata
           const meta = await fetchTokenMeta(tokenMint, rpcUrl);
           let priceUsd = meta.priceUsd;
-          if (priceUsd === 0 && tokenMint === SOL_MINT) {
-            priceUsd = await fetchSolPrice();
+          let symbol = meta.symbol;
+          let name = meta.name;
+
+          // WSOL = Wrapped SOL — perlakukan sama kayak SOL (harga + label)
+          if (tokenMint === SOL_MINT) {
+            symbol = "SOL";
+            name = "Solana";
+            if (priceUsd === 0) priceUsd = await fetchSolPrice();
           }
 
           const decimals = meta.decimals;
@@ -250,11 +256,11 @@ export async function fetchJupLockHoldings(
 
           if (valueUsd < 0.01 && amountReadable < 0.0001) continue;
 
-          const style = styleFor(meta.symbol);
+          const style = styleFor(symbol);
 
           all.push({
-            symbol: meta.symbol,
-            name: meta.name,
+            symbol,
+            name,
             amount: amountReadable,
             priceUsd,
             valueUsd,
@@ -266,7 +272,7 @@ export async function fetchJupLockHoldings(
           });
 
           console.log(
-            `[JupLock]   → ${meta.symbol} ${amountReadable.toFixed(4)} ($${valueUsd.toFixed(2)}) locked`,
+            `[JupLock]   → ${symbol} ${amountReadable.toFixed(4)} ($${valueUsd.toFixed(2)}) locked`,
           );
         } catch (parseErr) {
           console.error("[JupLock] parse error:", parseErr);
