@@ -1,7 +1,7 @@
 /**
  * Hourly check — bandingin sama snapshot terakhir, kirim notif kalo signifikan.
  *
- * Schedule: tiap jam (Vercel cron `0 * * * *`)
+ * Trigger: GitHub Actions (lihat .github/workflows/hourly.yml)
  * Threshold: kirim hanya kalo perubahan ≥ $5 atau ≥ 2%
  */
 
@@ -33,6 +33,7 @@ const fmtSignedUsd = (n: number) => {
 const fmtPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
 
 export async function GET(request: Request) {
+  // Optional secret to prevent random hits (set CRON_SECRET di env vars)
   const cronSecret = process.env.CRON_SECRET;
   if (cronSecret) {
     const authHeader = request.headers.get("authorization");
@@ -44,7 +45,6 @@ export async function GET(request: Request) {
   try {
     const today = await fetchPortfolio();
 
-    // Ambil last snapshot dari KV
     let last: {
       totalValueUsd: number;
       holdings: { symbol: string; valueUsd: number }[];
@@ -59,7 +59,6 @@ export async function GET(request: Request) {
       console.warn("[Hourly] KV read failed:", String(kvErr));
     }
 
-    // First run — simpan tapi ga kirim
     if (!last) {
       await kv.set(KV_KEY_LAST, {
         totalValueUsd: today.totalValueUsd,
@@ -75,12 +74,10 @@ export async function GET(request: Request) {
       });
     }
 
-    // Hitung diff
     const diffUsd = today.totalValueUsd - last.totalValueUsd;
     const diffPct =
       last.totalValueUsd > 0 ? (diffUsd / last.totalValueUsd) * 100 : 0;
 
-    // Threshold check
     const passesThreshold =
       Math.abs(diffUsd) >= THRESHOLD_USD &&
       Math.abs(diffPct) >= THRESHOLD_PCT;
@@ -95,10 +92,8 @@ export async function GET(request: Request) {
       });
     }
 
-    // Build short message
     const arrow = diffUsd > 0 ? "📈" : "📉";
 
-    // Find biggest mover (asset yang berubah paling banyak)
     const lastMap = new Map(last.holdings.map((h) => [h.symbol, h.valueUsd]));
     let biggestMover: { symbol: string; diff: number } | null = null;
     for (const h of today.holdings) {
@@ -132,7 +127,6 @@ export async function GET(request: Request) {
       );
     }
 
-    // Save snapshot baru
     await kv.set(KV_KEY_LAST, {
       totalValueUsd: today.totalValueUsd,
       holdings: today.holdings.map((h) => ({
