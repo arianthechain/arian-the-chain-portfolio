@@ -15,8 +15,8 @@ export const maxDuration = 60;
 
 const KV_KEY_LAST = "portfolio:last-check";
 
-const THRESHOLD_USD = 1;
-// Single condition: hanya cek USD, percent diabaikan
+const THRESHOLD_USD = 0;
+// Notif tiap jam, apapun perubahannya (kecuali persis 0)
 
 const fmtUsd = (n: number) =>
   new Intl.NumberFormat("en-US", {
