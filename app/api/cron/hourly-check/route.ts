@@ -15,8 +15,8 @@ export const maxDuration = 60;
 
 const KV_KEY_LAST = "portfolio:last-check";
 
-const THRESHOLD_USD = 5;
-const THRESHOLD_PCT = 2;
+const THRESHOLD_USD = 1;
+// Single condition: hanya cek USD, percent diabaikan
 
 const fmtUsd = (n: number) =>
   new Intl.NumberFormat("en-US", {
@@ -78,9 +78,7 @@ export async function GET(request: Request) {
     const diffPct =
       last.totalValueUsd > 0 ? (diffUsd / last.totalValueUsd) * 100 : 0;
 
-    const passesThreshold =
-      Math.abs(diffUsd) >= THRESHOLD_USD &&
-      Math.abs(diffPct) >= THRESHOLD_PCT;
+    const passesThreshold = Math.abs(diffUsd) >= THRESHOLD_USD;
 
     if (!passesThreshold) {
       return NextResponse.json({
