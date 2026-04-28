@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { fetchPortfolio } from "@/lib/zerion";
 import { buildDailyMessage, sendTelegramMessage } from "@/lib/telegram";
-import { kv } from "@vercel/kv";
+import { kvGet, kvSet } from "@/lib/kv";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       holdings: { symbol: string; valueUsd: number }[];
     } | null = null;
     try {
-      const cached = await kv.get<{
+      const cached = await kvGet<{
         totalValueUsd: number;
         holdings: { symbol: string; valueUsd: number }[];
         savedAt: string;
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
     // 5. Save snapshot today (jadi "kemarin" untuk run besok)
     try {
-      await kv.set(KV_KEY, {
+      await kvSet(KV_KEY, {
         totalValueUsd: today.totalValueUsd,
         holdings: today.holdings.map((h) => ({
           symbol: h.symbol,
