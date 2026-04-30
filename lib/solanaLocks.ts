@@ -283,29 +283,39 @@ export async function fetchSolanaLocks(
         try {
           const { bytes } = acc;
           if (bytes.length < 152) continue;
-          // Layout (verified via dumpLocks.js):
+          // Layout (verified via dumpAllLocks.js):
           //   0..8     discriminator
-          //   8..40    creator (32 bytes)
-          //   40..72   recipient (32 bytes)
-          //   72..104  token mint (32 bytes)
+          //   8..40    creator
+          //   40..72   recipient
+          //   72..104  token mint
           //   104      amount (u64) — total locked
-          //   112      withdrawn (u64) — bisa equal amount kalo struct beda, treat as 0
-          //   120      start_time (i64)
-          //   128      end_time (i64)
-          //   136      cliff_time (i64)
+          //   112      cliff_amount (u64) — bukan withdrawn!
+          //   120      start_time (i64 unix seconds)
+          //   128      end_time (i64 unix seconds)
+          //   136      cliff_time (i64 unix seconds)
+          //
+          // Logic: kalo end_time udah lewat → udah bisa di-claim, skip.
+          //        kalo masih future → masih locked, count as still-locked.
           const mintAddr = bytesToBase58(bytes.slice(72, 104));
           const amount = readU64LE(bytes, 104);
-          const withdrawn = readU64LE(bytes, 112);
-          const remaining = Math.max(amount - withdrawn, 0);
+          const endTime = readU64LE(bytes, 128);
+          const nowSec = Math.floor(Date.now() / 1000);
+
+          if (endTime <= nowSec) {
+            console.log(
+              `[SatoshiLock-Sol]   skip mint=${mintAddr.slice(0, 8)} (expired, end=${endTime})`,
+            );
+            continue;
+          }
 
           console.log(
-            `[SatoshiLock-Sol]   mint=${mintAddr.slice(0, 8)} amount=${amount} withdrawn=${withdrawn} remaining=${remaining}`,
+            `[SatoshiLock-Sol]   mint=${mintAddr.slice(0, 8)} amount=${amount} end=${endTime} (future) — LOCKED`,
           );
 
-          if (remaining === 0) continue;
+          if (amount === 0) continue;
 
           const meta = await fetchTokenMeta(rpcUrl, mintAddr, solPriceCache);
-          const amt = remaining / Math.pow(10, meta.decimals);
+          const amt = amount / Math.pow(10, meta.decimals);
           const valueUsd = amt * meta.priceUsd;
           if (valueUsd < 0.01) continue;
 
