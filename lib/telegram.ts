@@ -20,17 +20,42 @@ const fmtSignedUsd = (n: number) => {
   return `${n > 0 ? "+" : ""}${fmtUsd(n)}`;
 };
 
+const fmtIdr = (n: number) => {
+  const rounded = Math.round(n);
+  return `Rp ${rounded.toLocaleString("en-US")}`;
+};
+
+const fmtSignedIdr = (n: number) => {
+  if (Math.abs(n) < 1000) return "Rp 0";
+  return `${n > 0 ? "+" : "-"}${fmtIdr(Math.abs(n))}`;
+};
+
 const fmtPct = (n: number) =>
   `${n > 0 ? "+" : ""}${n.toFixed(2)}%`;
+
+// Fetch USD/IDR rate dari exchangerate-api (no key, free, cached 1 hour)
+async function getUsdToIdr(): Promise<number> {
+  try {
+    const res = await fetch(
+      "https://api.exchangerate-api.com/v4/latest/USD",
+      { next: { revalidate: 3600 } },
+    );
+    if (!res.ok) return 16700; // fallback rate
+    const json = await res.json();
+    return Number(json?.rates?.IDR ?? 16700);
+  } catch {
+    return 16700;
+  }
+}
 
 /**
  * Build pesan daily snapshot.
  * yesterday = null kalo first run (belum ada data kemarin).
  */
-export function buildDailyMessage(
+export async function buildDailyMessage(
   today: PortfolioData,
   yesterday: { totalValueUsd: number; holdings: { symbol: string; valueUsd: number }[] } | null,
-): string {
+): Promise<string> {
   const date = new Date().toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -38,12 +63,17 @@ export function buildDailyMessage(
     timeZone: "Asia/Jakarta",
   });
 
+  const usdToIdr = await getUsdToIdr();
+
   const lines: string[] = [];
   lines.push(`📊 <b>Daily Log · ${date}</b>`);
   lines.push("");
 
-  // Net worth
-  lines.push(`<b>Net Worth</b>   ${fmtUsd(today.totalValueUsd)}`);
+  // Net worth (USD + IDR)
+  const idrValue = today.totalValueUsd * usdToIdr;
+  lines.push(
+    `<b>Net Worth</b>   ${fmtUsd(today.totalValueUsd)} / ${fmtIdr(idrValue)}`,
+  );
 
   // Today's diff (only if yesterday exists)
   if (yesterday) {
@@ -94,6 +124,34 @@ export function buildDailyMessage(
   lines.push("");
   lines.push(`<a href="https://arianthechain.com">arianthechain.com</a>`);
 
+  return lines.join("\n");
+}
+
+/**
+ * Build pesan hourly diff.
+ */
+export async function buildHourlyMessage(opts: {
+  diffUsd: number;
+  diffPct: number;
+  totalValueUsd: number;
+  biggestMover?: { symbol: string; diffUsd: number };
+}): Promise<string> {
+  const usdToIdr = await getUsdToIdr();
+  const arrow = opts.diffUsd > 0 ? "📈" : "📉";
+  const idrValue = opts.totalValueUsd * usdToIdr;
+
+  const lines: string[] = [];
+  lines.push(
+    `${arrow} <b>${fmtSignedUsd(opts.diffUsd)}</b> (${fmtPct(opts.diffPct)})`,
+  );
+  lines.push(
+    `Net Worth: ${fmtUsd(opts.totalValueUsd)} / ${fmtIdr(idrValue)}`,
+  );
+  if (opts.biggestMover && Math.abs(opts.biggestMover.diffUsd) >= 0.5) {
+    lines.push(
+      `${opts.biggestMover.symbol} ${fmtSignedUsd(opts.biggestMover.diffUsd)}`,
+    );
+  }
   return lines.join("\n");
 }
 

@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     }
 
     // 3. Build message
-    const message = buildDailyMessage(today, yesterday);
+    const message = await buildDailyMessage(today, yesterday);
     console.log("[Cron] message:\n", message);
 
     // 4. Send to Telegram

@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { fetchPortfolio } from "@/lib/zerion";
-import { sendTelegramMessage } from "@/lib/telegram";
+import { sendTelegramMessage, buildHourlyMessage } from "@/lib/telegram";
 import { kvGet, kvSet } from "@/lib/kv";
 
 export const dynamic = "force-dynamic";
@@ -90,32 +90,25 @@ export async function GET(request: Request) {
       });
     }
 
-    const arrow = diffUsd > 0 ? "📈" : "📉";
-
     const lastMap = new Map(last.holdings.map((h) => [h.symbol, h.valueUsd]));
-    let biggestMover: { symbol: string; diff: number } | null = null;
+    let biggestMover: { symbol: string; diffUsd: number } | null = null;
     for (const h of today.holdings) {
       const prev = lastMap.get(h.symbol) ?? 0;
       const d = h.valueUsd - prev;
       if (
         biggestMover === null ||
-        Math.abs(d) > Math.abs(biggestMover.diff)
+        Math.abs(d) > Math.abs(biggestMover.diffUsd)
       ) {
-        biggestMover = { symbol: h.symbol, diff: d };
+        biggestMover = { symbol: h.symbol, diffUsd: d };
       }
     }
 
-    const lines = [
-      `${arrow} <b>${fmtSignedUsd(diffUsd)} (${fmtPct(diffPct)})</b>`,
-      `<code>Net Worth: ${fmtUsd(today.totalValueUsd)}</code>`,
-    ];
-    if (biggestMover && Math.abs(biggestMover.diff) >= 0.5) {
-      lines.push(
-        `<code>${biggestMover.symbol} ${fmtSignedUsd(biggestMover.diff)}</code>`,
-      );
-    }
-
-    const message = lines.join("\n");
+    const message = await buildHourlyMessage({
+      diffUsd,
+      diffPct,
+      totalValueUsd: today.totalValueUsd,
+      biggestMover: biggestMover ?? undefined,
+    });
     const result = await sendTelegramMessage(message);
 
     if (!result.ok) {
