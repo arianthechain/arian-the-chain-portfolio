@@ -282,11 +282,17 @@ export async function fetchSolanaLocks(
       for (const acc of accounts) {
         try {
           const { bytes } = acc;
-          if (bytes.length < 171) continue;
-          // Layout (verified):
-          //   72..104  mint
-          //   104      amount (u64)
-          //   112      withdrawn (u64)
+          if (bytes.length < 152) continue;
+          // Layout (verified via dumpLocks.js):
+          //   0..8     discriminator
+          //   8..40    creator (32 bytes)
+          //   40..72   recipient (32 bytes)
+          //   72..104  token mint (32 bytes)
+          //   104      amount (u64) — total locked
+          //   112      withdrawn (u64) — bisa equal amount kalo struct beda, treat as 0
+          //   120      start_time (i64)
+          //   128      end_time (i64)
+          //   136      cliff_time (i64)
           const mintAddr = bytesToBase58(bytes.slice(72, 104));
           const amount = readU64LE(bytes, 104);
           const withdrawn = readU64LE(bytes, 112);
