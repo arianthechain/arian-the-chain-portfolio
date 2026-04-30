@@ -283,39 +283,36 @@ export async function fetchSolanaLocks(
         try {
           const { bytes } = acc;
           if (bytes.length < 152) continue;
-          // Layout (verified via dumpAllLocks.js):
+          // Layout (verified):
           //   0..8     discriminator
           //   8..40    creator
           //   40..72   recipient
           //   72..104  token mint
           //   104      amount (u64) — total locked
-          //   112      cliff_amount (u64) — bukan withdrawn!
-          //   120      start_time (i64 unix seconds)
-          //   128      end_time (i64 unix seconds)
-          //   136      cliff_time (i64 unix seconds)
+          //   112      withdrawn (u64) — kalo 0 berarti belum claim
+          //   120      start_time (i64)
+          //   128      end_time (i64)
           //
-          // Logic: kalo end_time udah lewat → udah bisa di-claim, skip.
-          //        kalo masih future → masih locked, count as still-locked.
+          // Logic: kalo withdrawn == amount → udah fully claimed, skip.
+          //        kalo withdrawn < amount → masih ada SOL ke-lock (claimable atau belum cliff).
           const mintAddr = bytesToBase58(bytes.slice(72, 104));
           const amount = readU64LE(bytes, 104);
-          const endTime = readU64LE(bytes, 128);
-          const nowSec = Math.floor(Date.now() / 1000);
+          const withdrawn = readU64LE(bytes, 112);
+          const remaining = Math.max(amount - withdrawn, 0);
 
-          if (endTime <= nowSec) {
+          if (remaining === 0) {
             console.log(
-              `[SatoshiLock-Sol]   skip mint=${mintAddr.slice(0, 8)} (expired, end=${endTime})`,
+              `[SatoshiLock-Sol]   skip mint=${mintAddr.slice(0, 8)} (fully withdrawn)`,
             );
             continue;
           }
 
           console.log(
-            `[SatoshiLock-Sol]   mint=${mintAddr.slice(0, 8)} amount=${amount} end=${endTime} (future) — LOCKED`,
+            `[SatoshiLock-Sol]   mint=${mintAddr.slice(0, 8)} amount=${amount} withdrawn=${withdrawn} remaining=${remaining} — LOCKED`,
           );
 
-          if (amount === 0) continue;
-
           const meta = await fetchTokenMeta(rpcUrl, mintAddr, solPriceCache);
-          const amt = amount / Math.pow(10, meta.decimals);
+          const amt = remaining / Math.pow(10, meta.decimals);
           const valueUsd = amt * meta.priceUsd;
           if (valueUsd < 0.01) continue;
 
