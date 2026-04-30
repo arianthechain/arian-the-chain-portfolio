@@ -282,22 +282,13 @@ export async function fetchSolanaLocks(
       for (const acc of accounts) {
         try {
           const { bytes } = acc;
-          if (bytes.length < 152) continue;
-          // Layout (verified):
-          //   0..8     discriminator
-          //   8..40    creator
-          //   40..72   recipient
-          //   72..104  token mint
-          //   104      amount (u64) — total locked
-          //   112      withdrawn (u64) — kalo 0 berarti belum claim
-          //   120      start_time (i64)
-          //   128      end_time (i64)
-          //
-          // Logic: kalo withdrawn == amount → udah fully claimed, skip.
-          //        kalo withdrawn < amount → masih ada SOL ke-lock (claimable atau belum cliff).
+          if (bytes.length < 171) continue;
+          // Match cryptoretire logic exactly:
+          // https://cryptoretire.app uses DataView.getBigUint64 with proper byteOffset
+          const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
           const mintAddr = bytesToBase58(bytes.slice(72, 104));
-          const amount = readU64LE(bytes, 104);
-          const withdrawn = readU64LE(bytes, 112);
+          const amount = Number(view.getBigUint64(104, true));
+          const withdrawn = Number(view.getBigUint64(112, true));
           const remaining = Math.max(amount - withdrawn, 0);
 
           if (remaining === 0) {
