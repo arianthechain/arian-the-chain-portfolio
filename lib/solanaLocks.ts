@@ -141,8 +141,7 @@ async function getAccountsForOwner(
         if (!dataB64) continue;
         results.push({ pubkey: a.pubkey, bytes: b64ToBytes(dataB64) });
       }
-      // Kalo udah dapet di offset ini, bisa stop (sesuai cryptoretire)
-      if (results.length > 0) break;
+      // Loop semua offset, dedupe via `seen` set (sesuai cryptoretire)
     } catch (err) {
       console.error(
         `[Locks] getProgramAccounts ${programId.slice(0, 8)} offset=${offset} failed:`,
