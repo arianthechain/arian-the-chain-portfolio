@@ -109,24 +109,26 @@ function decodeLockIds(hex: string): string[] {
  *   slot 1: recipient (address)
  *   slot 2: token (address)
  *   slot 3: totalAmount (uint256)
- *   slot 4: withdrawnAmount (uint256)
- *   slot 5+: timing & flags (skip)
+ *   slot 4: cliffAmount/other (NOT withdrawn)
+ *   slot 5: startTime (uint256)
+ *   slot 6: endTime (uint256)
+ *   slot 7+: cliffTime, freq, flags (skip)
  */
 function decodeLock(hex: string): {
   creator: string;
   recipient: string;
   token: string;
   totalAmount: bigint;
-  withdrawnAmount: bigint;
+  endTime: bigint;
 } | null {
   const data = stripHex(hex);
-  if (data.length < 5 * 64) return null;
+  if (data.length < 7 * 64) return null;
   return {
     creator: readAddress(data, 0),
     recipient: readAddress(data, 1),
     token: readAddress(data, 2),
     totalAmount: readU256(data, 3),
-    withdrawnAmount: readU256(data, 4),
+    endTime: readU256(data, 6),
   };
 }
 
@@ -174,7 +176,6 @@ export async function fetchEvmLocks(
         try {
           const lockIdNoPrefix = stripHex(lockId);
 
-          // getLock harus berhasil, kalo revert berarti lockId invalid
           const lockHex = await ethCallWithFallback(
             SATOSHILOCK_V3,
             SEL_GET_LOCK + lockIdNoPrefix,
@@ -183,31 +184,18 @@ export async function fetchEvmLocks(
           const lock = decodeLock(lockHex);
           if (!lock) {
             console.warn(
-              `[SatoshiLock-V3]   lock ${lockId.slice(0, 12)}: decode failed (data too short)`,
+              `[SatoshiLock-V3]   lock ${lockId.slice(0, 12)}: decode failed`,
             );
             continue;
           }
 
-          // claimable() bisa revert kalo lock belum mulai (startTime di masa depan)
-          // atau cliff belum habis. Kalo revert → assume nothing claimable yet.
-          let claimable = 0n;
-          try {
-            const claimableHex = await ethCallWithFallback(
-              SATOSHILOCK_V3,
-              SEL_CLAIMABLE + lockIdNoPrefix,
-            );
-            claimable = BigInt("0x" + (stripHex(claimableHex) || "0"));
-          } catch (claimErr) {
-            console.log(
-              `[SatoshiLock-V3]   lock ${lockId.slice(0, 12)}: claimable() reverted (likely not started yet) — treating as 0`,
-            );
-          }
-
-          const stillLocked =
-            lock.totalAmount - lock.withdrawnAmount - claimable;
+          // Logic: kalo endTime udah lewat → udah bisa di-claim, skip.
+          //        kalo masih future → masih locked, count amount.
+          const nowSec = BigInt(Math.floor(Date.now() / 1000));
+          const stillLocked = lock.endTime > nowSec ? lock.totalAmount : 0n;
 
           console.log(
-            `[SatoshiLock-V3]   lock=${lockId.slice(0, 12)} token=${lock.token.slice(0, 10)} total=${lock.totalAmount} withdrawn=${lock.withdrawnAmount} claimable=${claimable} stillLocked=${stillLocked}`,
+            `[SatoshiLock-V3]   lock=${lockId.slice(0, 12)} token=${lock.token.slice(0, 10)} total=${lock.totalAmount} end=${lock.endTime} stillLocked=${stillLocked}`,
           );
 
           if (stillLocked <= 0n) continue;
