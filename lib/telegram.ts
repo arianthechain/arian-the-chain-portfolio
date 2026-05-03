@@ -69,10 +69,10 @@ export async function buildDailyMessage(
   lines.push(`📊 <b>Daily Log · ${date}</b>`);
   lines.push("");
 
-  // Net worth (USD + IDR)
+  // Net worth (USD + IDR) — pake <code> biar bisa di-copy
   const idrValue = today.totalValueUsd * usdToIdr;
   lines.push(
-    `<b>Net Worth</b>   ${fmtUsd(today.totalValueUsd)} / ${fmtIdr(idrValue)}`,
+    `<b>Net Worth</b>   <code>${fmtUsd(today.totalValueUsd)} / ${fmtIdr(idrValue)}</code>`,
   );
 
   // Today's diff (only if yesterday exists)
@@ -145,11 +145,11 @@ export async function buildHourlyMessage(opts: {
     `${arrow} <b>${fmtSignedUsd(opts.diffUsd)}</b> (${fmtPct(opts.diffPct)})`,
   );
   lines.push(
-    `Net Worth: ${fmtUsd(opts.totalValueUsd)} / ${fmtIdr(idrValue)}`,
+    `<code>Net Worth: ${fmtUsd(opts.totalValueUsd)} / ${fmtIdr(idrValue)}</code>`,
   );
   if (opts.biggestMover && Math.abs(opts.biggestMover.diffUsd) >= 0.5) {
     lines.push(
-      `${opts.biggestMover.symbol} ${fmtSignedUsd(opts.biggestMover.diffUsd)}`,
+      `<code>${opts.biggestMover.symbol} ${fmtSignedUsd(opts.biggestMover.diffUsd)}</code>`,
     );
   }
   return lines.join("\n");
