@@ -48,6 +48,21 @@ async function getUsdToIdr(): Promise<number> {
   }
 }
 
+// Fetch BTC price dari CoinGecko (no key, free, cached 5 min)
+async function getBtcPrice(): Promise<number> {
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+      { next: { revalidate: 300 } },
+    );
+    if (!res.ok) return 0;
+    const json = await res.json();
+    return Number(json?.bitcoin?.usd ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Build pesan daily snapshot.
  * yesterday = null kalo first run (belum ada data kemarin).
@@ -63,7 +78,10 @@ export async function buildDailyMessage(
     timeZone: "Asia/Jakarta",
   });
 
-  const usdToIdr = await getUsdToIdr();
+  const [usdToIdr, btcPrice] = await Promise.all([
+    getUsdToIdr(),
+    getBtcPrice(),
+  ]);
 
   const lines: string[] = [];
   lines.push(`📊 <b>Daily Log · ${date}</b>`);
@@ -122,6 +140,9 @@ export async function buildDailyMessage(
   }
 
   lines.push("");
+  if (btcPrice > 0) {
+    lines.push(`<code>BTC: ${fmtUsd(btcPrice)}</code>`);
+  }
   lines.push(`<code>1 USD = ${fmtIdr(usdToIdr)}</code>`);
   lines.push(`<a href="https://arianthechain.com">arianthechain.com</a>`);
 
@@ -137,7 +158,10 @@ export async function buildHourlyMessage(opts: {
   totalValueUsd: number;
   biggestMover?: { symbol: string; diffUsd: number };
 }): Promise<string> {
-  const usdToIdr = await getUsdToIdr();
+  const [usdToIdr, btcPrice] = await Promise.all([
+    getUsdToIdr(),
+    getBtcPrice(),
+  ]);
   const arrow = opts.diffUsd > 0 ? "📈" : "📉";
   const idrValue = opts.totalValueUsd * usdToIdr;
 
@@ -152,6 +176,9 @@ export async function buildHourlyMessage(opts: {
     lines.push(
       `<code>${opts.biggestMover.symbol} ${fmtSignedUsd(opts.biggestMover.diffUsd)}</code>`,
     );
+  }
+  if (btcPrice > 0) {
+    lines.push(`<code>BTC: ${fmtUsd(btcPrice)}</code>`);
   }
   lines.push(`<code>1 USD = ${fmtIdr(usdToIdr)}</code>`);
   return lines.join("\n");
