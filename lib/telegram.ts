@@ -122,6 +122,7 @@ export async function buildDailyMessage(
   }
 
   lines.push("");
+  lines.push(`<code>1 USD = ${fmtIdr(usdToIdr)}</code>`);
   lines.push(`<a href="https://arianthechain.com">arianthechain.com</a>`);
 
   return lines.join("\n");
@@ -152,6 +153,7 @@ export async function buildHourlyMessage(opts: {
       `<code>${opts.biggestMover.symbol} ${fmtSignedUsd(opts.biggestMover.diffUsd)}</code>`,
     );
   }
+  lines.push(`<code>1 USD = ${fmtIdr(usdToIdr)}</code>`);
   return lines.join("\n");
 }
 
