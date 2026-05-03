@@ -48,23 +48,57 @@ async function getUsdToIdr(): Promise<number> {
   }
 }
 
-// Fetch BTC price dari Binance (no key, free, cached 5 min)
+// Fetch BTC price dari Binance (no key, free, no-cache untuk reliability)
 async function getBtcPrice(): Promise<number> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(
       "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-      { next: { revalidate: 300 } },
+      {
+        signal: controller.signal,
+        cache: "no-store",
+      },
     );
+    clearTimeout(timeout);
     if (!res.ok) {
-      console.warn(`[Telegram] BTC price fetch failed: HTTP ${res.status}`);
-      return 0;
+      console.warn(`[Telegram] BTC price Binance failed: HTTP ${res.status}, trying fallback`);
+      return await getBtcPriceFallback();
     }
     const json = await res.json();
     const price = Number(json?.price ?? 0);
-    console.log(`[Telegram] BTC price: $${price}`);
+    if (price === 0) return await getBtcPriceFallback();
+    console.log(`[Telegram] BTC price (Binance): $${price}`);
     return price;
   } catch (err) {
-    console.warn(`[Telegram] BTC price error:`, err);
+    console.warn(`[Telegram] BTC Binance error:`, err);
+    return await getBtcPriceFallback();
+  }
+}
+
+// Fallback: Coinbase API
+async function getBtcPriceFallback(): Promise<number> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(
+      "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+      {
+        signal: controller.signal,
+        cache: "no-store",
+      },
+    );
+    clearTimeout(timeout);
+    if (!res.ok) {
+      console.warn(`[Telegram] BTC price Coinbase failed: HTTP ${res.status}`);
+      return 0;
+    }
+    const json = await res.json();
+    const price = Number(json?.data?.amount ?? 0);
+    console.log(`[Telegram] BTC price (Coinbase): $${price}`);
+    return price;
+  } catch (err) {
+    console.warn(`[Telegram] BTC Coinbase error:`, err);
     return 0;
   }
 }
