@@ -48,17 +48,23 @@ async function getUsdToIdr(): Promise<number> {
   }
 }
 
-// Fetch BTC price dari CoinGecko (no key, free, cached 5 min)
+// Fetch BTC price dari Binance (no key, free, cached 5 min)
 async function getBtcPrice(): Promise<number> {
   try {
     const res = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+      "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
       { next: { revalidate: 300 } },
     );
-    if (!res.ok) return 0;
+    if (!res.ok) {
+      console.warn(`[Telegram] BTC price fetch failed: HTTP ${res.status}`);
+      return 0;
+    }
     const json = await res.json();
-    return Number(json?.bitcoin?.usd ?? 0);
-  } catch {
+    const price = Number(json?.price ?? 0);
+    console.log(`[Telegram] BTC price: $${price}`);
+    return price;
+  } catch (err) {
+    console.warn(`[Telegram] BTC price error:`, err);
     return 0;
   }
 }
