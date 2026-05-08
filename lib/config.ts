@@ -25,7 +25,7 @@ const _config: AppConfig = {
       "0x1503E5acb203e1C19ad490f34D19271127493E3a",
     ],
     solana: [
-      "5u7ngES9qymhkQqVRPWYoBfXGSrEjveM2EZcWuRwcJgA",
+      "EYfcbotWjUmmTCS6GhXYpBygMKVYrcMQz39cSJArqMqF",
     ],
     bitcoin: [
       // Tambah address Bitcoin lo
